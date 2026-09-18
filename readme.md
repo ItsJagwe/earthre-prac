@@ -86,23 +86,22 @@ The dashboard is calculated from the cleaned records stored in the database.
 
 For the supplied 30-day dataset:
 
-| Metric                   | Calculation / Result                                     |
-| ------------------------ | -------------------------------------------------------- |
-| **Total checks**         | Count of rows: **15,552**                                |
-| **Successful checks**    | `is_available = true` (`200`): **15,359**                |
-| **Failed checks**        | `500 / 502 / 503 / 999`: **193**                         |
-| **Overall availability** | `15,359 / 15,552 = 98.76%`                               |
-| **Average latency**      | Mean of `latency_ms`, ignoring `NULL` values: **366 ms** |
-| **Services below 99.9%** | Availability calculated separately per service: **5**    |
-| **Monitoring period**    | Earliest → latest timestamp: **Apr 6 – May 5, 2025**     |
+| Metric                   | Calculation / Result                                                                                             |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| **Total checks**         | Count of all cleaned and deduplicated records.                                                                   |
+| **Successful checks**    | Count of records where `is_available = true` (`status_code = 200`).                                              |
+| **Failed checks**        | Count of records where `is_available = false` (`500 / 502 / 503 / 999`).                                         |
+| **Overall availability** | `(Successful checks / Total checks) × 100`                                                                       |
+| **Average latency**      | Mean of `latency_ms`, ignoring `NULL` values.                                                                    |
+| **Services below 99.9%** | Availability is calculated separately for each service and services below the `99.9%` SLA threshold are counted. |
+| **Monitoring period**    | Earliest valid timestamp → latest valid timestamp.                                                               |
 
-Missing latency values are therefore excluded from the average latency calculation and are **not** treated as failed checks.
+Missing latency values are excluded from the average latency calculation and are **not** treated as failed checks.
 
-The logs table displays these same processed monitoring records.
+The logs table displays the same cleaned and processed monitoring records used for the dashboard calculations.
 
 Date/date-range filters are applied in the browser to the loaded dataset; they do not require a separate logs API.
 
----
 
 # Architecture
 
