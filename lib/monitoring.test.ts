@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  EMPTY_LOG_FILTER,
   buildDashboardModel,
-  filterLogsByDate,
+  filterLogs,
   getCheckOutcome,
   type MonitoringCheck,
 } from "./monitoring.ts";
@@ -84,6 +85,41 @@ describe("dashboard aggregation", () => {
       model.services.map((service) => service.id),
       ["svc-auth", "svc-search"],
     );
+    assert.equal(model.summary.serviceCount, 2);
+  });
+
+  it("lists services from the stored rows instead of a fixed catalog", () => {
+    const model = buildDashboardModel([
+      check({
+        id: 1,
+        service_id: "svc-custom",
+        service_name: "custom-api",
+      }),
+    ]);
+
+    assert.deepEqual(
+      model.services.map((service) => [service.id, service.name]),
+      [["svc-custom", "custom-api"]],
+    );
+  });
+
+  it("filters failed checks from the log table", () => {
+    const model = buildDashboardModel([
+      check({ id: 1, status_code: 200, is_available: true }),
+      check({
+        id: 2,
+        timestamp: "2025-05-08T00:15:00.000Z",
+        status_code: 500,
+        is_available: false,
+      }),
+    ]);
+
+    const failed = filterLogs(model.logs, {
+      ...EMPTY_LOG_FILTER,
+      availability: "failed",
+    });
+    assert.equal(failed.length, 1);
+    assert.equal(failed[0].statusCode, 500);
   });
 
   it("filters logs by UTC date", () => {
@@ -92,7 +128,10 @@ describe("dashboard aggregation", () => {
       check({ id: 2, timestamp: "2025-05-09T01:00:00.000Z" }),
     ]);
 
-    const filtered = filterLogsByDate(model.logs, "2025-05-09", "");
+    const filtered = filterLogs(model.logs, {
+      ...EMPTY_LOG_FILTER,
+      from: "2025-05-09",
+    });
     assert.equal(filtered.length, 1);
     assert.equal(filtered[0].id, "2");
   });

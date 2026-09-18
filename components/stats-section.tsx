@@ -77,7 +77,9 @@ export function StatsSection({
               <StatCard
                 label="Total checks"
                 value={formatNumber(summary.totalChecks)}
-                hint="Five services, one check / 15 min"
+                hint={`${formatNumber(summary.serviceCount)} service${
+                  summary.serviceCount === 1 ? "" : "s"
+                } in this dataset`}
               />
               <StatCard
                 label="Successful checks"

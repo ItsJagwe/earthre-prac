@@ -11,20 +11,16 @@ import { formatNumber } from "@/lib/format";
 import { uploadMonitoringCsv } from "@/lib/ingest-client";
 import { fetchMonitoringChecks } from "@/lib/monitoring-api";
 import {
+  EMPTY_LOG_FILTER,
   PAGE_SIZE,
   buildDashboardModel,
-  filterLogsByDate,
+  filterLogs,
+  uniqueLogOptions,
   type DashboardModel,
+  type LogFilter,
 } from "@/lib/monitoring";
 
 type UploadStatus = "idle" | "processing" | "ready" | "error";
-
-type DateFilter = {
-  from: string;
-  to: string;
-};
-
-const EMPTY_FILTER: DateFilter = { from: "", to: "" };
 
 export function Dashboard() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -35,8 +31,8 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [statsOpen, setStatsOpen] = useState(true);
-  const [draftFilter, setDraftFilter] = useState<DateFilter>(EMPTY_FILTER);
-  const [appliedFilter, setAppliedFilter] = useState<DateFilter>(EMPTY_FILTER);
+  const [draftFilter, setDraftFilter] = useState<LogFilter>(EMPTY_LOG_FILTER);
+  const [appliedFilter, setAppliedFilter] = useState<LogFilter>(EMPTY_LOG_FILTER);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -70,8 +66,8 @@ export function Dashboard() {
     setResultMessage(null);
     setFilename(file.name);
     setStatus("processing");
-    setDraftFilter(EMPTY_FILTER);
-    setAppliedFilter(EMPTY_FILTER);
+    setDraftFilter(EMPTY_LOG_FILTER);
+    setAppliedFilter(EMPTY_LOG_FILTER);
     setPage(1);
     setStatsOpen(true);
 
@@ -94,9 +90,14 @@ export function Dashboard() {
     }
   }
 
+  const logOptions = useMemo(
+    () => (model ? uniqueLogOptions(model.logs) : { services: [], statusCodes: [], agents: [] }),
+    [model],
+  );
+
   const filteredLogs = useMemo(() => {
     if (!model) return [];
-    return filterLogsByDate(model.logs, appliedFilter.from, appliedFilter.to);
+    return filterLogs(model.logs, appliedFilter);
   }, [model, appliedFilter]);
 
   const pageCount = Math.max(1, Math.ceil(filteredLogs.length / PAGE_SIZE));
@@ -182,14 +183,17 @@ export function Dashboard() {
               periodEnd={model.summary.periodEnd}
               draftFilter={draftFilter}
               appliedFilter={appliedFilter}
+              services={logOptions.services}
+              statusCodes={logOptions.statusCodes}
+              agents={logOptions.agents}
               onDraftChange={setDraftFilter}
               onApply={() => {
                 setAppliedFilter(draftFilter);
                 setPage(1);
               }}
               onClear={() => {
-                setDraftFilter(EMPTY_FILTER);
-                setAppliedFilter(EMPTY_FILTER);
+                setDraftFilter(EMPTY_LOG_FILTER);
+                setAppliedFilter(EMPTY_LOG_FILTER);
                 setPage(1);
               }}
               onPageChange={setPage}

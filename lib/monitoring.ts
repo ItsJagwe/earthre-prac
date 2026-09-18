@@ -1,14 +1,6 @@
 export const SLA_THRESHOLD = 99.9;
 export const PAGE_SIZE = 12;
 
-const SERVICE_ORDER = [
-  "svc-auth",
-  "svc-payments",
-  "svc-search",
-  "svc-reports",
-  "svc-notify",
-];
-
 export type MonitoringCheck = {
   id: number;
   service_id: string;
@@ -28,6 +20,7 @@ export type DashboardSummary = {
   failedChecks: number;
   avgLatencyMs: number | null;
   servicesBelowSla: number;
+  serviceCount: number;
   periodStart: string;
   periodEnd: string;
 };
@@ -72,21 +65,23 @@ export function getCheckOutcome(
   return "unknown";
 }
 
-export function filterLogsByDate(
-  logs: MonitoringLog[],
-  from: string,
-  to: string,
-): MonitoringLog[] {
-  if (!from && !to) return logs;
+export type LogFilter = {
+  from: string;
+  to: string;
+  serviceId: string;
+  availability: "" | "available" | "failed";
+  statusCode: string;
+  agent: string;
+};
 
-  const start = from || to;
-  const end = to || from;
-
-  return logs.filter((log) => {
-    const day = log.timestamp.slice(0, 10);
-    return day >= start && day <= end;
-  });
-}
+export const EMPTY_LOG_FILTER: LogFilter = {
+  from: "",
+  to: "",
+  serviceId: "",
+  availability: "",
+  statusCode: "",
+  agent: "",
+};
 
 export function buildDashboardModel(checks: MonitoringCheck[]): DashboardModel {
   const totalChecks = checks.length;
@@ -119,7 +114,7 @@ export function buildDashboardModel(checks: MonitoringCheck[]): DashboardModel {
         avgLatencyMs: averageLatency(rows.map((row) => row.latency_ms)),
       };
     })
-    .sort((a, b) => serviceSortIndex(a.id) - serviceSortIndex(b.id));
+    .sort((a, b) => a.id.localeCompare(b.id));
 
   return {
     summary: {
@@ -130,6 +125,7 @@ export function buildDashboardModel(checks: MonitoringCheck[]): DashboardModel {
       avgLatencyMs,
       servicesBelowSla: services.filter((service) => !meetsSla(service.availability))
         .length,
+      serviceCount: services.length,
       periodStart,
       periodEnd,
     },
@@ -147,13 +143,56 @@ export function buildDashboardModel(checks: MonitoringCheck[]): DashboardModel {
   };
 }
 
+export function filterLogs(
+  logs: MonitoringLog[],
+  filter: LogFilter,
+): MonitoringLog[] {
+  return logs.filter((log) => {
+    if (filter.from || filter.to) {
+      const start = filter.from || filter.to;
+      const end = filter.to || filter.from;
+      const day = log.timestamp.slice(0, 10);
+      if (day < start || day > end) return false;
+    }
+
+    if (filter.serviceId && log.serviceId !== filter.serviceId) return false;
+    if (filter.agent && log.agent !== filter.agent) return false;
+    if (filter.statusCode && String(log.statusCode) !== filter.statusCode) {
+      return false;
+    }
+    if (filter.availability === "available" && log.statusCode !== 200) {
+      return false;
+    }
+    if (filter.availability === "failed" && log.statusCode === 200) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+export function uniqueLogOptions(logs: MonitoringLog[]) {
+  const services = new Map<string, string>();
+  const statusCodes = new Set<number>();
+  const agents = new Set<string>();
+
+  for (const log of logs) {
+    services.set(log.serviceId, log.serviceName);
+    statusCodes.add(log.statusCode);
+    agents.add(log.agent);
+  }
+
+  return {
+    services: [...services.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+    statusCodes: [...statusCodes].sort((a, b) => a - b),
+    agents: [...agents].sort((a, b) => a.localeCompare(b)),
+  };
+}
+
 function averageLatency(values: Array<number | null>): number | null {
   const present = values.filter((value): value is number => value != null);
   if (present.length === 0) return null;
   return Math.round(present.reduce((sum, value) => sum + value, 0) / present.length);
-}
-
-function serviceSortIndex(id: string): number {
-  const index = SERVICE_ORDER.indexOf(id);
-  return index === -1 ? SERVICE_ORDER.length : index;
 }
