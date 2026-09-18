@@ -1,7 +1,7 @@
 import { Pagination } from "@/components/pagination";
 import { StatusBadge } from "@/components/status-badge";
 import { formatLatency, formatNumber, formatTimestamp } from "@/lib/format";
-import { getCheckOutcome, type MonitoringLog } from "@/lib/mock-data";
+import { getCheckOutcome, type MonitoringLog } from "@/lib/monitoring";
 
 type LogsTableProps = {
   logs: MonitoringLog[];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { EmptyState } from "@/components/empty-state";
 import { LogsSection } from "@/components/logs-section";
@@ -9,13 +9,13 @@ import { ServiceOverview } from "@/components/service-overview";
 import { StatsSection } from "@/components/stats-section";
 import { formatNumber } from "@/lib/format";
 import { uploadMonitoringCsv } from "@/lib/ingest-client";
+import { fetchMonitoringChecks } from "@/lib/monitoring-api";
 import {
   PAGE_SIZE,
-  dashboardSummary,
+  buildDashboardModel,
   filterLogsByDate,
-  monitoringLogs,
-  serviceSummaries,
-} from "@/lib/mock-data";
+  type DashboardModel,
+} from "@/lib/monitoring";
 
 type UploadStatus = "idle" | "processing" | "ready" | "error";
 
@@ -28,6 +28,8 @@ const EMPTY_FILTER: DateFilter = { from: "", to: "" };
 
 export function Dashboard() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const [model, setModel] = useState<DashboardModel | null>(null);
   const [status, setStatus] = useState<UploadStatus>("idle");
   const [filename, setFilename] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +38,22 @@ export function Dashboard() {
   const [draftFilter, setDraftFilter] = useState<DateFilter>(EMPTY_FILTER);
   const [appliedFilter, setAppliedFilter] = useState<DateFilter>(EMPTY_FILTER);
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    void loadChecks();
+  }, []);
+
+  async function loadChecks() {
+    try {
+      const checks = await fetchMonitoringChecks();
+      setModel(checks.length > 0 ? buildDashboardModel(checks) : null);
+    } catch {
+      setModel(null);
+      setError("Could not load monitoring checks.");
+    } finally {
+      setHydrated(true);
+    }
+  }
 
   function openFilePicker() {
     inputRef.current?.click();
@@ -64,17 +82,22 @@ export function Dashboard() {
       return;
     }
 
-    setResultMessage(
-      `Data processed successfully · ${formatNumber(result.summary.rowsInserted)} inserted`,
-    );
-    setStatus("ready");
+    try {
+      await loadChecks();
+      setResultMessage(
+        `Data processed successfully · ${formatNumber(result.summary.rowsInserted)} inserted`,
+      );
+      setStatus("ready");
+    } catch {
+      setError("The CSV was saved, but the dashboard could not reload it.");
+      setStatus("error");
+    }
   }
 
-  const filteredLogs = useMemo(
-    () =>
-      filterLogsByDate(monitoringLogs, appliedFilter.from, appliedFilter.to),
-    [appliedFilter],
-  );
+  const filteredLogs = useMemo(() => {
+    if (!model) return [];
+    return filterLogsByDate(model.logs, appliedFilter.from, appliedFilter.to);
+  }, [model, appliedFilter]);
 
   const pageCount = Math.max(1, Math.ceil(filteredLogs.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -83,13 +106,20 @@ export function Dashboard() {
     currentPage * PAGE_SIZE,
   );
 
+  const showDashboard = Boolean(model) && status !== "processing";
+
   return (
     <div className="min-h-screen bg-[#f4f5f7] text-zinc-900">
       <DashboardHeader
         filename={filename}
-        status={status}
+        status={status === "idle" && model ? "ready" : status}
         error={error}
-        resultMessage={resultMessage}
+        resultMessage={
+          resultMessage ??
+          (model && status === "idle"
+            ? `${formatNumber(model.summary.totalChecks)} checks loaded`
+            : null)
+        }
         disabled={status === "processing"}
         onUploadClick={openFilePicker}
       />
@@ -107,7 +137,18 @@ export function Dashboard() {
       />
 
       <main className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-5 sm:px-6">
-        {status === "idle" || status === "error" ? (
+        {!hydrated && status !== "processing" ? (
+          <ProcessingState title="Loading monitoring data..." />
+        ) : null}
+
+        {status === "processing" && filename ? (
+          <ProcessingState
+            title="Processing monitoring data..."
+            detail={filename}
+          />
+        ) : null}
+
+        {hydrated && !showDashboard && status !== "processing" ? (
           <section className="rounded-lg border border-dashed border-zinc-300 bg-white">
             <EmptyState
               title="No monitoring data yet"
@@ -125,22 +166,20 @@ export function Dashboard() {
           </section>
         ) : null}
 
-        {status === "processing" && filename ? (
-          <ProcessingState filename={filename} />
-        ) : null}
-
-        {status === "ready" ? (
+        {showDashboard && model ? (
           <>
             <StatsSection
-              summary={dashboardSummary}
+              summary={model.summary}
               expanded={statsOpen}
               onToggle={() => setStatsOpen((open) => !open)}
             />
-            <ServiceOverview services={serviceSummaries} />
+            <ServiceOverview services={model.services} />
             <LogsSection
               logs={pagedLogs}
               total={filteredLogs.length}
               page={currentPage}
+              periodStart={model.summary.periodStart}
+              periodEnd={model.summary.periodEnd}
               draftFilter={draftFilter}
               appliedFilter={appliedFilter}
               onDraftChange={setDraftFilter}

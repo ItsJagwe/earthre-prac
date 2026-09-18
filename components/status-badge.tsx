@@ -1,4 +1,4 @@
-import { getCheckOutcome, type StatusCode } from "@/lib/mock-data";
+import { getCheckOutcome } from "@/lib/monitoring";
 
 const STYLES = {
   available:
@@ -14,7 +14,7 @@ const LABELS = {
 } as const;
 
 type StatusBadgeProps = {
-  statusCode: StatusCode;
+  statusCode: number;
 };
 
 export function StatusBadge({ statusCode }: StatusBadgeProps) {

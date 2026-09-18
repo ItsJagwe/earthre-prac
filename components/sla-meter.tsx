@@ -1,4 +1,4 @@
-import { SLA_THRESHOLD } from "@/lib/mock-data";
+import { SLA_THRESHOLD } from "@/lib/monitoring";
 
 type SlaMeterProps = {
   value: number;

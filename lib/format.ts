@@ -6,7 +6,8 @@ export function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
 }
 
-export function formatLatency(ms: number): string {
+export function formatLatency(ms: number | null): string {
+  if (ms == null) return "—";
   return `${Math.round(ms)} ms`;
 }
 

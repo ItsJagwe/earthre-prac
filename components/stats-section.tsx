@@ -10,7 +10,7 @@ import {
   SLA_THRESHOLD,
   meetsSla,
   type DashboardSummary,
-} from "@/lib/mock-data";
+} from "@/lib/monitoring";
 
 type StatsSectionProps = {
   summary: DashboardSummary;
@@ -93,8 +93,12 @@ export function StatsSection({
               />
               <StatCard
                 label="Avg latency"
-                value={`${formatNumber(summary.avgLatencyMs)} ms`}
-                hint="Mean response time across checks"
+                value={
+                  summary.avgLatencyMs == null
+                    ? "—"
+                    : `${formatNumber(summary.avgLatencyMs)} ms`
+                }
+                hint="Mean response time across checks with latency"
               />
               <StatCard
                 label="Services below 99.9%"

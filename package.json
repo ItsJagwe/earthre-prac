@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test lib/ingestion/process.test.ts"
+    "test": "tsx --test lib/ingestion/process.test.ts lib/monitoring.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

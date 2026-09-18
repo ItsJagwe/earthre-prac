@@ -3,7 +3,7 @@ import {
   SLA_THRESHOLD,
   meetsSla,
   type ServiceSummary,
-} from "@/lib/mock-data";
+} from "@/lib/monitoring";
 
 type ServiceOverviewProps = {
   services: ServiceSummary[];
@@ -58,7 +58,9 @@ export function ServiceOverview({ services }: ServiceOverviewProps) {
                     {formatNumber(service.failedChecks)}
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono text-zinc-700">
-                    {service.avgLatencyMs} ms
+                    {service.avgLatencyMs == null
+                      ? "—"
+                      : `${service.avgLatencyMs} ms`}
                   </td>
                   <td className="px-4 py-2.5">
                     <span

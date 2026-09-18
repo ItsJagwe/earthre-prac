@@ -2,11 +2,7 @@ import { EmptyState } from "@/components/empty-state";
 import { LogFilters } from "@/components/log-filters";
 import { LogsTable } from "@/components/logs-table";
 import { formatPeriod } from "@/lib/format";
-import {
-  PAGE_SIZE,
-  dashboardSummary,
-  type MonitoringLog,
-} from "@/lib/mock-data";
+import { PAGE_SIZE, type MonitoringLog } from "@/lib/monitoring";
 
 type DateFilter = {
   from: string;
@@ -17,6 +13,8 @@ type LogsSectionProps = {
   logs: MonitoringLog[];
   total: number;
   page: number;
+  periodStart: string;
+  periodEnd: string;
   draftFilter: DateFilter;
   appliedFilter: DateFilter;
   onDraftChange: (next: DateFilter) => void;
@@ -29,6 +27,8 @@ export function LogsSection({
   logs,
   total,
   page,
+  periodStart,
+  periodEnd,
   draftFilter,
   appliedFilter,
   onDraftChange,
@@ -38,10 +38,7 @@ export function LogsSection({
 }: LogsSectionProps) {
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasFilter = Boolean(appliedFilter.from || appliedFilter.to);
-  const period = formatPeriod(
-    dashboardSummary.periodStart,
-    dashboardSummary.periodEnd,
-  );
+  const period = formatPeriod(periodStart, periodEnd);
 
   return (
     <section className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
@@ -58,8 +55,8 @@ export function LogsSection({
         <LogFilters
           draft={draftFilter}
           applied={appliedFilter}
-          minDate={dashboardSummary.periodStart.slice(0, 10)}
-          maxDate={dashboardSummary.periodEnd.slice(0, 10)}
+          minDate={periodStart.slice(0, 10)}
+          maxDate={periodEnd.slice(0, 10)}
           onDraftChange={onDraftChange}
           onApply={onApply}
           onClear={onClear}
