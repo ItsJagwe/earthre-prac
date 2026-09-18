@@ -2,8 +2,9 @@ import { CsvUpload } from "@/components/csv-upload";
 
 type DashboardHeaderProps = {
   filename: string | null;
-  status: "idle" | "processing" | "ready";
+  status: "idle" | "processing" | "ready" | "error";
   error: string | null;
+  resultMessage?: string | null;
   disabled?: boolean;
   onUploadClick: () => void;
 };
@@ -12,6 +13,7 @@ export function DashboardHeader({
   filename,
   status,
   error,
+  resultMessage,
   disabled,
   onUploadClick,
 }: DashboardHeaderProps) {
@@ -30,6 +32,7 @@ export function DashboardHeader({
           filename={filename}
           status={status}
           error={error}
+          resultMessage={resultMessage}
           disabled={disabled}
           onUploadClick={onUploadClick}
         />

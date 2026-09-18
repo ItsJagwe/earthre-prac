@@ -1,9 +1,12 @@
 "use client";
 
+type UploadStatus = "idle" | "processing" | "ready" | "error";
+
 type CsvUploadProps = {
   filename: string | null;
-  status: "idle" | "processing" | "ready";
+  status: UploadStatus;
   error: string | null;
+  resultMessage?: string | null;
   disabled?: boolean;
   onUploadClick: () => void;
 };
@@ -12,6 +15,7 @@ export function CsvUpload({
   filename,
   status,
   error,
+  resultMessage,
   disabled = false,
   onUploadClick,
 }: CsvUploadProps) {
@@ -27,8 +31,10 @@ export function CsvUpload({
               {status === "processing"
                 ? "Processing monitoring data..."
                 : status === "ready"
-                  ? "Data processed successfully"
-                  : "Selected"}
+                  ? (resultMessage ?? "Data processed successfully")
+                  : status === "error"
+                    ? "Processing failed"
+                    : "Selected"}
             </p>
           </div>
         ) : null}

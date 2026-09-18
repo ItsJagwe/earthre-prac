@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { EmptyState } from "@/components/empty-state";
 import { LogsSection } from "@/components/logs-section";
 import { ProcessingState } from "@/components/processing-state";
 import { ServiceOverview } from "@/components/service-overview";
 import { StatsSection } from "@/components/stats-section";
+import { formatNumber } from "@/lib/format";
+import { uploadMonitoringCsv } from "@/lib/ingest-client";
 import {
   PAGE_SIZE,
   dashboardSummary,
@@ -15,7 +17,7 @@ import {
   serviceSummaries,
 } from "@/lib/mock-data";
 
-type UploadStatus = "idle" | "processing" | "ready";
+type UploadStatus = "idle" | "processing" | "ready" | "error";
 
 type DateFilter = {
   from: string;
@@ -26,38 +28,28 @@ const EMPTY_FILTER: DateFilter = { from: "", to: "" };
 
 export function Dashboard() {
   const inputRef = useRef<HTMLInputElement>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [status, setStatus] = useState<UploadStatus>("idle");
   const [filename, setFilename] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [statsOpen, setStatsOpen] = useState(true);
   const [draftFilter, setDraftFilter] = useState<DateFilter>(EMPTY_FILTER);
   const [appliedFilter, setAppliedFilter] = useState<DateFilter>(EMPTY_FILTER);
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current !== null) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
   function openFilePicker() {
     inputRef.current?.click();
   }
 
-  function handleFileSelected(file: File) {
+  async function handleFileSelected(file: File) {
     if (!file.name.toLowerCase().endsWith(".csv")) {
       setError("Select a .csv file.");
+      setStatus((current) => (current === "ready" ? "ready" : "error"));
       return;
     }
 
-    if (timeoutRef.current !== null) {
-      clearTimeout(timeoutRef.current);
-    }
-
     setError(null);
+    setResultMessage(null);
     setFilename(file.name);
     setStatus("processing");
     setDraftFilter(EMPTY_FILTER);
@@ -65,19 +57,22 @@ export function Dashboard() {
     setPage(1);
     setStatsOpen(true);
 
-    timeoutRef.current = setTimeout(() => {
-      setStatus("ready");
-      timeoutRef.current = null;
-    }, 1400);
+    const result = await uploadMonitoringCsv(file);
+    if (!result.success) {
+      setError(result.error);
+      setStatus("error");
+      return;
+    }
+
+    setResultMessage(
+      `Data processed successfully · ${formatNumber(result.summary.rowsInserted)} inserted`,
+    );
+    setStatus("ready");
   }
 
   const filteredLogs = useMemo(
     () =>
-      filterLogsByDate(
-        monitoringLogs,
-        appliedFilter.from,
-        appliedFilter.to,
-      ),
+      filterLogsByDate(monitoringLogs, appliedFilter.from, appliedFilter.to),
     [appliedFilter],
   );
 
@@ -94,6 +89,7 @@ export function Dashboard() {
         filename={filename}
         status={status}
         error={error}
+        resultMessage={resultMessage}
         disabled={status === "processing"}
         onUploadClick={openFilePicker}
       />
@@ -106,12 +102,12 @@ export function Dashboard() {
         onChange={(event) => {
           const file = event.target.files?.[0];
           event.target.value = "";
-          if (file) handleFileSelected(file);
+          if (file) void handleFileSelected(file);
         }}
       />
 
       <main className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-5 sm:px-6">
-        {status === "idle" ? (
+        {status === "idle" || status === "error" ? (
           <section className="rounded-lg border border-dashed border-zinc-300 bg-white">
             <EmptyState
               title="No monitoring data yet"
